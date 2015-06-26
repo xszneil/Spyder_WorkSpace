@@ -48,7 +48,6 @@ def draw():
     window.exitonclick()
 
 def draw_square(brad):
-    line_num = 0
     for i in range(4):
       brad.forward(150)
       brad.right(90)
@@ -81,10 +80,33 @@ client = TwilioRestClient(account_sid, auth_token)
 message = client.messages.create(to="+13522227518",from_="+15169861050",body="Hello there!")
 
 
+#=======
+import urllib
+
+def read_text():
+    quotes = open('movie_quotes.txt')
+    contents_of_file = quotes.read()
+    #print(contents_of_file)
+    check_profanity(contents_of_file)
+    quotes.close()
+
+def check_profanity(text):
+    conn = urllib.urlopen("http://www.wdyl.com/profanity?q="+text)
+    output = conn.read()
+    print(output)
+    conn.close()
+    
 
 
-
-
+#==============
+class Movie():
+    def __init__(self, movie_title, movie_storyline, movie_photo, movie_trailer):
+        self.title = movie_title
+        self.storyline = movie_storyline
+        self.poster_image_url = movie_photo
+        self.trailer_youtube_url = movie_trailer
+    def show_trail(self):
+        webbrowser.open (self.trailer_youtube_url)
 
 
 
