@@ -7,6 +7,7 @@ Created on Mon Jul 13 13:59:56 2015
 
 import numpy 
 import matplotlib.pyplot as plt
+
 import pandas as pd 
 from pandas import DataFrame 
 from pandas import Series
@@ -14,12 +15,15 @@ from pandas import Series
 
 def is_open_at(x, op, ed, op_S, ed_S, delay=0):
     if x.weekday() == 6:
-        return op_S-delay <= x.hour & x.hour < ed_S + delay
+        return (op_S-delay <= x.hour) and (x.hour < ed_S + delay)
     else:
-        return op-delay <= x.hour & x.hour < ed + delay
+        return (op-delay <= x.hour) and (x.hour < ed + delay)
 
-def is_lighting_ecm(x, name, thld, mult=1, bar=0):
-    return (x.open == False) & (x[name] > mult * thld + bar)
+def is_lighting_ecm(x, name, thld, mult=1, add=0):
+    return (x.open == False) and (x[name] > mult * thld + add)
+    
+def is_lighting_ecm2(x, name, thld, ave, mult=0):
+    return (x.open == False) and (x[name] > mult * ave + (1 - mult) * thld )
 
 def event_to_ecm(df, site, thld, limit = 0):
     ecms = {'start':[], 'end':[], 'saving':[]}
@@ -31,7 +35,7 @@ def event_to_ecm(df, site, thld, limit = 0):
             while df.ecm[i]:
                 i = i + 1
                 save = save + (df[site][i] - thld) * 5 / 60
-            if i-j >= limit:
+            if (i-j >= limit) and (df[site][j] != df[site][i-1] or df[site][j] != df[site][j+1]):
                 ecms['start'].append(df.index[j])
                 ecms['end'].append(df.index[i])
                 ecms['saving'].append(save)
@@ -39,13 +43,16 @@ def event_to_ecm(df, site, thld, limit = 0):
             i = i + 1
     return ecms
 
-def plot_ecm(data, start_str, end_str, site, result):
+def plot_ecm(data, start_str, end_str, site, result, thld, daytime):
     ecms = result[site]
     p = data.ix[start_str:end_str, site].plot(title = site)
     p.set_ylabel('Lighting Demand Power 5 min (kw)')
     p.set_xlabel('Timestamp')
+    p.axhline(y = thld, color='r', linewidth = 2)
+    p.axhline(y = daytime, color='r', linewidth = 2)
+    p.axhline(y = 0.3*thld + 0.7*daytime, color='g', linestyle='--', linewidth = 2)
     for i in range(len(ecms['start'])):
-        p.axvspan(ecms['start'][i], ecms['end'][i], facecolor='r', alpha=0.3)
+        p.axvspan(ecms['start'][i], ecms['end'][i], facecolor='y', alpha=0.4)
 
 def output_ecm(result):
     result_list = []
@@ -71,7 +78,8 @@ def simulation(data,df_info):
         t.index = df.index
         
         df['open'] = t
-        df['ecm'] = df.apply(is_lighting_ecm, name=site, thld=s.Threshold, mult=1.3, bar = 3, axis=1)
+#        df['ecm'] = df.apply(is_lighting_ecm, name=site, thld=s.Threshold, mult=1.3, add = 3, axis=1)
+        df['ecm'] = df.apply(is_lighting_ecm2, name=site, thld=s.Threshold, ave=s.DaytimeAve, mult=0.7, axis=1)
         df.ix[-1,'ecm'] = False   #make sure the alarm will stop, i know i am lazy
            
         if df['ecm'].any():
@@ -83,6 +91,7 @@ def simulation(data,df_info):
     
     return result
 
+
 if __name__ == "__main__":
     #read the site info=================================================
     df_info = pd.read_csv('./file/site_info.csv',sep=',')
@@ -90,25 +99,67 @@ if __name__ == "__main__":
     df_info.set_index('SiteName', inplace=True)    #maybe just use sitename as index, as long it is verified
     
     #read the demand power data=========================================
-    data = pd.read_csv('./file/Jun BR.csv', sep=',')
+    data = pd.read_csv('./file/601-700.csv', sep=',')
     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
     data.set_index('time', inplace=True)
     data.replace(to_replace=0, value=numpy.NaN, inplace=True) #some 0s seems like missing value
     data.fillna(method='ffill', inplace=True) 
     
-    result = simulation(data, df_info)
-    
-    sites = data.columns.values
-    
+    result = simulation(data, df_info)  #get the result from simulation
+        
     r1 = output_ecm(result)   
-    r2 = r1.merge(df_info,left_index=True,right_index=True)
-    r2.to_csv('./Lighting ECM BR Jun.csv')    
+    r2 = r1.merge(df_info, left_index=True, right_index=True)
+    r2.to_csv('./fig/Lighting ECM 501-600.csv')    
     
-    #r2[r2.SiteName == sites[9]]
     
-    l = r2.SiteName.unique()
-    for i in range(len(l)):
-        plot_ecm(data,'20150601','20150630',l[i],result)
-        plt.savefig("./fig/"+l[i]+".jpeg")
+    sites = r2.index.unique()
+    plt.rc('figure', figsize=(40, 25)) #need %pylab
+    for i in range(len(sites)):
+        plot_ecm(data,'20150601', '20150630', sites[i], result, df_info.ix[sites[i]].Threshold, df_info.ix[sites[i]].DaytimeAve)
+        plt.savefig("./fig/"+sites[i]+".jpeg", dpi = 150)
         plt.close()
-    
+
+
+
+
+#==============================================================================
+#calculate the daytime average
+# arr = ['1-50', '51-100', '101-200', '201-300', '301-400', '401-500', '501-600', '601-700']
+# daytime_ave = []
+# for f in arr:
+#     data = pd.read_csv('./file/'+f+'.csv', sep=',')
+#     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
+#     data.set_index('time', inplace=True)
+#     daytime_ave.append(data.between_time('10:00','15:00').mean())        
+# df_ave = DataFrame(pd.concat(daytime_ave))
+# df_ave.to_csv('./ave.csv')
+#==============================================================================
+
+#==============================================================================
+# #calculate the daytime average， removed all duplicates
+# arr = ['1-50', '51-100', '101-200', '201-300', '301-400', '401-500', '501-600', '601-700']
+# daytime_ave = []
+# for f in arr:
+#     data = pd.read_csv('./file/'+f+'.csv', sep=',')
+#     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
+#     data.set_index('time', inplace=True)
+#     
+#     for site in data.columns:
+#         df = DataFrame(data[site]).drop_duplicates()
+#         ave = df.between_time('10:00','15:00').mean()
+#         daytime_ave.append(ave)        
+#  
+# df_ave = DataFrame(pd.concat(daytime_ave))       
+# df_ave.to_csv('./ave.csv')
+#==============================================================================
+
+
+#==============================================================================
+# some trivial test, ignore it now
+#  def average(arr):
+#     return arr.sum() / arr.size 
+#     
+#     r2['duration'] = r2.end - r2.start
+#     grouped = r2.groupby(level = 0)
+#     g = grouped.agg({'saving' : ['sum', 'mean', 'size'], 'duration' : ['sum', average]})    
+#==============================================================================
