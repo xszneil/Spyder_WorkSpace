@@ -1,3 +1,4 @@
+#!/usr/bin/python2.7
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 13 13:59:56 2015
@@ -99,58 +100,45 @@ if __name__ == "__main__":
     df_info.set_index('SiteName', inplace=True)    #maybe just use sitename as index, as long it is verified
     
     #read the demand power data=========================================
-    data = pd.read_csv('./file/601-700.csv', sep=',')
+    data = pd.read_csv('./file/26-50.csv', sep=',')
     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
     data.set_index('time', inplace=True)
     data.replace(to_replace=0, value=numpy.NaN, inplace=True) #some 0s seems like missing value
-    data.fillna(method='ffill', inplace=True) 
+    data = data.resample('5min',fill_method='ffill')
+    #data.fillna(method='ffill', inplace=True) 
     
     result = simulation(data, df_info)  #get the result from simulation
         
     r1 = output_ecm(result)   
     r2 = r1.merge(df_info, left_index=True, right_index=True)
-    r2.to_csv('./fig/Lighting ECM 501-600.csv')    
+    r2.to_csv('./fig/July Lighting ECM 26-50.csv')    
     
     
     sites = r2.index.unique()
     plt.rc('figure', figsize=(40, 25)) #need %pylab
     for i in range(len(sites)):
-        plot_ecm(data,'20150601', '20150630', sites[i], result, df_info.ix[sites[i]].Threshold, df_info.ix[sites[i]].DaytimeAve)
+        plot_ecm(data,'20150701', '20150724', sites[i], result, df_info.ix[sites[i]].Threshold, df_info.ix[sites[i]].DaytimeAve)
         plt.savefig("./fig/"+sites[i]+".jpeg", dpi = 150)
         plt.close()
 
 
-
-
 #==============================================================================
-#calculate the daytime average
-# arr = ['1-50', '51-100', '101-200', '201-300', '301-400', '401-500', '501-600', '601-700']
-# daytime_ave = []
-# for f in arr:
-#     data = pd.read_csv('./file/'+f+'.csv', sep=',')
-#     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
-#     data.set_index('time', inplace=True)
-#     daytime_ave.append(data.between_time('10:00','15:00').mean())        
-# df_ave = DataFrame(pd.concat(daytime_ave))
-# df_ave.to_csv('./ave.csv')
-#==============================================================================
-
-#==============================================================================
-# #calculate the daytime average， removed all duplicates
-# arr = ['1-50', '51-100', '101-200', '201-300', '301-400', '401-500', '501-600', '601-700']
-# daytime_ave = []
-# for f in arr:
-#     data = pd.read_csv('./file/'+f+'.csv', sep=',')
-#     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
-#     data.set_index('time', inplace=True)
-#     
-#     for site in data.columns:
-#         df = DataFrame(data[site]).drop_duplicates()
-#         ave = df.between_time('10:00','15:00').mean()
-#         daytime_ave.append(ave)        
-#  
-# df_ave = DataFrame(pd.concat(daytime_ave))       
-# df_ave.to_csv('./ave.csv')
+#calculate the daytime average， removed all duplicates
+#arr = ['1-50', '51-100', '101-200', '201-300', '301-400', '401-500', '501-600', '601-700']
+#arr=['1-25','26-50']
+#daytime_ave = []
+#for f in arr:
+#    data = pd.read_csv('./file/'+f+'.csv', sep=',')
+#    data['time'] = pd.to_datetime(data['time'], dayfirst=True)
+#    data.set_index('time', inplace=True)
+#    
+#    for site in data.columns:
+#        df = DataFrame(data[site]).drop_duplicates()
+#        ave = df.between_time('10:00','15:00').mean()
+#        daytime_ave.append(ave)        
+# 
+#df_ave = DataFrame(pd.concat(daytime_ave))       
+#df_ave.to_csv('./ave.csv')
 #==============================================================================
 
 
