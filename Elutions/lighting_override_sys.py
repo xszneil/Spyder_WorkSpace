@@ -45,15 +45,16 @@ def event_to_ecm(df, site, thld, limit = 0):
     return ecms
 
 def plot_ecm(data, start_str, end_str, site, result, thld, daytime):
-    ecms = result[site]
     p = data.ix[start_str:end_str, site].plot(title = site)
     p.set_ylabel('Lighting Demand Power 5 min (kw)')
     p.set_xlabel('Timestamp')
     p.axhline(y = thld, color='r', linewidth = 2)
     p.axhline(y = daytime, color='r', linewidth = 2)
     p.axhline(y = 0.3*thld + 0.7*daytime, color='g', linestyle='--', linewidth = 2)
-    for i in range(len(ecms['start'])):
-        p.axvspan(ecms['start'][i], ecms['end'][i], facecolor='y', alpha=0.4)
+    if site in result:
+        ecms = result[site]
+        for i in range(len(ecms['start'])):
+            p.axvspan(ecms['start'][i], ecms['end'][i], facecolor='y', alpha=0.4)
 
 def output_ecm(result):
     result_list = []
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     df_info.set_index('SiteName', inplace=True)    #maybe just use sitename as index, as long it is verified
     
     #read the demand power data=========================================
-    data = pd.read_csv('./file/26-50.csv', sep=',')
+    data = pd.read_csv('./file/1-50.csv', sep=',')
     data['time'] = pd.to_datetime(data['time'], dayfirst=True)
     data.set_index('time', inplace=True)
     data.replace(to_replace=0, value=numpy.NaN, inplace=True) #some 0s seems like missing value
@@ -111,15 +112,26 @@ if __name__ == "__main__":
         
     r1 = output_ecm(result)   
     r2 = r1.merge(df_info, left_index=True, right_index=True)
-    r2.to_csv('./fig/July Lighting ECM 26-50.csv')    
+    r2.to_csv('./fig/July Lighting ECM 1-50.csv')    
     
-    
-    sites = r2.index.unique()
-    plt.rc('figure', figsize=(40, 25)) #need %pylab
-    for i in range(len(sites)):
-        plot_ecm(data,'20150701', '20150724', sites[i], result, df_info.ix[sites[i]].Threshold, df_info.ix[sites[i]].DaytimeAve)
-        plt.savefig("./fig/"+sites[i]+".jpeg", dpi = 150)
-        plt.close()
+#==============================================================================
+#plot ecm sites only
+#    sites = r2.index.unique()
+#    plt.rc('figure', figsize=(40, 25)) #need %pylab
+#    for i in range(len(sites)):
+#        plot_ecm(data,'20150601', '20150624', sites[i], result, df_info.ix[sites[i]].Threshold, df_info.ix[sites[i]].DaytimeAve)
+#        plt.savefig("./fig/"+sites[i]+".jpeg", dpi = 150)
+#        plt.close()
+
+#==============================================================================
+#plot all the sites
+#    for site in data.columns:
+#        plot_ecm(data,'20150601', '20150624', site, result, df_info.ix[site].Threshold, df_info.ix[site].DaytimeAve)
+#        if site in r2.index:
+#            plt.savefig("./fig/ecm/"+site+".jpeg", dpi = 150)
+#        else:
+#            plt.savefig("./fig/nonecm/"+site+".jpeg", dpi = 100)
+#        plt.close()
 
 
 #==============================================================================
